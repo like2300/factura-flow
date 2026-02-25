@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facture Pro - References Dynamiques</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #111827;
+            --secondary: #6B7280;
+            --accent: #2563eb;
+            --bg: #f3f4f6;
+            --white: #ffffff;
+            --border: #e5e7eb;
+            --paper-w: 210mm;
+            --paper-h: 297mm;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+            font-family: 'Inter', sans-serif;
+            color: var(--primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        /* Buttons */
+        .menu-btn {
+            position: fixed; top: 20px; width: 50px; height: 50px;
+            background: var(--white); border: none; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; z-index: 1001;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .menu-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2); }
+        .menu-btn.left { left: 20px; }
+        .menu-btn.right { right: 20px; }
+        .menu-btn.bottom-left { top: auto; bottom: 20px; left: 20px; background: linear-gradient(135deg, #059669, #047857); color: white; }
+        .menu-btn.bottom-left i { color: white; }
+        .menu-btn i { font-size: 1.1rem; color: var(--primary); }
+
+        /* Overlay & Sidebars */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); opacity: 0; visibility: hidden; z-index: 999; transition: 0.3s; }
+        .overlay.active { opacity: 1; visibility: visible; }
+
+        .sidebar {
+            position: fixed; top: 0; width: 360px; max-width: 92vw; height: 100vh;
+            background: var(--white); z-index: 1000;
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        .sidebar.left-panel { left: 0; transform: translateX(-100%); }
+        .sidebar.left-panel.open { transform: translateX(0); }
+        .sidebar.right-panel { right: 0; transform: translateX(100%); }
+        .sidebar.right-panel.open { transform: translateX(0); }
+
+        .sb-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #fafafa, #f5f5f5); }
+        .sb-header h3 { font-size: 0.95rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .sb-close { background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--secondary); transition: color 0.2s; }
+        .sb-close:hover { color: var(--danger); }
+        .sb-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+        /* Forms */
+        .section-title { font-size: 0.7rem; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 15px; margin-top: 25px; border-bottom: 2px solid var(--accent); padding-bottom: 8px; display: block; letter-spacing: 0.5px; }
+        .section-title:first-child { margin-top: 0; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 0.75rem; color: var(--secondary); font-weight: 600; margin-bottom: 6px; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.85rem; transition: all 0.2s; background: #fafafa; }
+        .form-control:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); background: white; }
+
+        /* Special Grid for Ref */
+        .ref-grid { display: grid; grid-template-columns: 80px 1fr; gap: 10px; }
+        .ref-grid input { text-align: center; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+
+        textarea.form-control { resize: vertical; min-height: 60px; }
+
+        .btn-action { width: 100%; padding: 12px; border: 1px solid var(--border); background: var(--white); border-radius: 8px; cursor: pointer; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; font-size: 0.85rem; }
+        .btn-action:hover { background: #f5f5f5; border-color: #ccc; transform: translateY(-1px); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), #374151); color: white; border: none; }
+        .btn-success { background: linear-gradient(135deg, #059669, #047857); color: white; border: none; }
+
+        /* Modals */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 2000; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: 0.3s; }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content { background: white; width: 94%; max-width: 500px; max-height: 90vh; overflow-y: auto; border-radius: 16px; transform: translateY(20px) scale(0.95); transition: 0.3s; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3); }
+        .modal-overlay.active .modal-content { transform: translateY(0) scale(1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, #fafafa, #f5f5f5); border-radius: 16px 16px 0 0; }
+        .modal-header h3 { font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+        .modal-body { padding: 20px; }
+
+        /* Project List */
+        .search-box { position: relative; margin-bottom: 20px; }
+        .search-box input { padding-left: 40px; }
+        .search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--secondary); }
+        .project-list { max-height: 350px; overflow-y: auto; }
+        .project-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: #fafafa; cursor: pointer; transition: all 0.2s; }
+        .project-item:hover { background: #f0f0f0; border-color: var(--accent); }
+        .project-item .project-info h4 { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; }
+        .project-item .project-info span { font-size: 0.75rem; color: var(--secondary); }
+        .project-item .project-actions { display: flex; gap: 8px; }
+        .project-item .project-actions button { width: 32px; height: 32px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .project-item .btn-load { background: var(--accent); color: white; }
+        .project-item .btn-delete { background: #fee2e2; color: var(--danger); }
+        .current-project-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 15px; margin-bottom: 20px; }
+        .current-project-box h4 { font-size: 0.8rem; color: var(--accent); margin-bottom: 5px; text-transform: uppercase; }
+        .current-project-box .project-name { font-weight: 700; font-size: 1rem; margin-bottom: 10px; display: block; }
+
+        /* Canvas Invoice */
+        .canvas-wrapper { width: 100%; display: flex; justify-content: center; padding: 80px 20px; padding-bottom: 100px; }
+        .sheet { width: var(--paper-w); min-height: var(--paper-h); background: white; padding: 15mm; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2); position: relative; transform-origin: top center; flex-shrink: 0; }
+
+        #watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); width: 90%; opacity: 0.08; pointer-events: none; display: none; z-index: 0; }
+        #watermark img { width: 100%; height: auto; filter: grayscale(100%); }
+        .header-grid { display: flex; justify-content: space-between; margin-bottom: 35px; padding-bottom: 20px; border-bottom: 3px solid var(--primary); }
+        .brand h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 5px; }
+        .brand p { color: var(--secondary); font-size: 0.9rem; }
+        .provider-type { display: inline-block; background: var(--primary); color: white; padding: 3px 10px; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 8px; }
+        .meta { text-align: right; font-size: 0.9rem; }
+        .meta span { display: block; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 1.1rem; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+        .block h4 { font-size: 0.7rem; text-transform: uppercase; color: var(--secondary); margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .block-content { font-size: 0.95rem; line-height: 1.6; white-space: pre-line; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th { text-align: left; font-size: 0.7rem; text-transform: uppercase; padding: 12px 8px; border-bottom: 2px solid var(--primary); color: var(--secondary); background: #f9fafb; }
+        td { padding: 14px 8px; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .totals-section { display: flex; justify-content: flex-end; }
+        .totals-box { width: 45%; }
+        .t-row { display: flex; justify-content: space-between; padding: 8px 0; }
+        .t-row.big { border-top: 3px solid var(--primary); margin-top: 10px; padding-top: 14px; font-weight: 700; font-size: 1.15rem; }
+        .t-row.tva-exempt { font-size: 0.8rem; color: var(--secondary); font-style: italic; }
+
+        .footer-area { position: relative; margin-top: 50px; }
+        .footer-notes { background: #f9fafb; padding: 18px; border-radius: 8px; font-size: 0.85rem; border-top: 2px solid var(--border); }
+        .footer-notes h4 { font-size: 0.85rem; margin-bottom: 8px; font-weight: 600; }
+
+        /* Stamp */
+        .svg-filters { position: absolute; width: 0; height: 0; }
+        .stamp-container { position: absolute; bottom: 100%; right: 20px; margin-bottom: 20px; transform: rotate(-8deg); padding: 14px 24px; border-radius: 4px; font-weight: 800; text-transform: uppercase; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; text-align: center; z-index: 10; filter: url(#roughpaper); mix-blend-mode: multiply; border: 3px solid currentColor; box-shadow: inset 0 0 0 2px currentColor; }
+        .stamp-container.show { opacity: 0.8; }
+        .stamp-container.type-invoice { color: #b91c1c; background: rgba(255, 255, 255, 0.5); }
+        .stamp-container.type-quote { color: #1d4ed8; background: rgba(239, 246, 255, 0.5); border-style: dashed; }
+        .stamp-container.type-deposit { color: #d97706; background: rgba(255, 247, 237, 0.5); }
+        .stamp-text { display: block; font-size: 1.3rem; letter-spacing: 1px; font-family: 'Courier New', monospace; }
+        .stamp-sub { display: block; font-size: 0.65rem; margin-top: 5px; opacity: 0.8; }
+
+        /* Responsive Canvas */
+        @media (max-width: 900px) { .sheet { transform: scale(0.6); margin-bottom: -450px; } .canvas-wrapper { padding-top: 60px; } }
+        @media (max-width: 600px) { .sheet { transform: scale(0.42); margin-bottom: -700px; } .canvas-wrapper { padding-top: 50px; } }
+
+        /* Print */
+        @media print {
+            body { background: white; }
+            .menu-btn, .sidebar, .overlay, .btn-del-row, .modal-overlay { display: none !important; }
+            .canvas-wrapper { padding: 0; }
+            .sheet { box-shadow: none; transform: none; width: 210mm; min-height: 297mm; padding: 15mm; margin: 0; }
+            .stamp-container { opacity: 0.8 !important; }
+            
+            /* Watermark - Grand en arrière-plan */
+            #watermark { display: flex !important; opacity: 0.1 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            
+            /* Provider Type Badge - Force Background Print */
+            .provider-type { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .provider-type.corporate { background: var(--primary) !important; color: white !important; }
+            .provider-type.independent { background: #fff7ed !important; color: #9a3412 !important; border-color: #fed7aa !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <svg class="svg-filters">
+        <filter id="roughpaper">
+            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+    </svg>
+
+    <!-- Boutons -->
+    <button class="menu-btn left" id="btnProfile" title="Donnees"><i class="fas fa-user-circle"></i></button>
+    <button class="menu-btn right" id="btnOptions" title="Options"><i class="fas fa-cogs"></i></button>
+    <button class="menu-btn bottom-left" id="btnProjects" title="Projets"><i class="fas fa-folder-open"></i></button>
+
+    <div class="overlay" id="overlay"></div>
+
+    <!-- MODAL: Demarrage -->
+    <div class="modal-overlay" id="startupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-invoice" style="color:var(--accent);"></i> Nouvelle Facture</h3>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:15px; font-size:0.9rem; color:var(--secondary);">Nommez votre projet pour commencer.</p>
+                <div class="form-group">
+                    <label>Nom du projet</label>
+                    <input type="text" class="form-control" id="startupName" placeholder="Ex: Client Dupont - Janvier">
+                </div>
+                <button class="btn-action btn-primary" onclick="createProjectFromStartup()" style="margin-top:10px;">
+                    <i class="fas fa-rocket"></i> Commencer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Gestion Projets -->
+    <div class="modal-overlay" id="projectsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-folder-open" style="color:var(--success);"></i> Mes Factures</h3>
+                <button class="sb-close" onclick="closeModal('projectsModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="current-project-box" id="currentProjectSection" style="display:none;">
+                    <h4><i class="fas fa-edit"></i> Projet en cours</h4>
+                    <span class="project-name" id="currentProjectName">...</span>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-action btn-success" style="margin:0; flex:1;" onclick="saveCurrentProject()"><i class="fas fa-save"></i> Sauvegarder</button>
+                        <button class="btn-action" style="margin:0;" onclick="printCurrentProject()"><i class="fas fa-print"></i></button>
+                    </div>
+                </div>
+
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Rechercher..." oninput="filterProjects()">
+                </div>
+
+                <button class="btn-action btn-primary" onclick="initNewProject()" style="margin-bottom:20px;">
+                    <i class="fas fa-plus"></i> Nouvelle facture
+                </button>
+
+                <h4 style="font-size:0.8rem; color:var(--secondary); margin-bottom:15px; text-transform:uppercase;">Projets sauvegardes</h4>
+                <div class="project-list" id="projectList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Ajout Ligne -->
+    <div class="modal-overlay" id="lineModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle" style="color:var(--accent);"></i> Prestation</h3>
+                <button class="sb-close" onclick="closeModal('lineModal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="form-control" id="modalDesc" rows="2"></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label>Qte</label>
+                        <input type="number" class="form-control" id="modalQty" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Prix U.</label>
+                        <input type="number" class="form-control" id="modalPrice" placeholder="10000">
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="btn-action" onclick="closeModal('lineModal')">Annuler</button>
+                    <button class="btn-action btn-primary" onclick="confirmAddLine()">Ajouter</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR GAUCHE (DATA) -->
+    <aside class="sidebar left-panel" id="leftSidebar">
+        <div class="sb-header">
+            <h3><i class="fas fa-user-edit"></i> Donnees</h3>
+            <button class="sb-close" onclick="closeSidebars()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="sb-body">
+            <!-- SECTION METADATA -->
+            <span class="section-title"><i class="fas fa-hashtag"></i> Reference & Date</span>
+
+            <!-- Nouveau systeme Reference -->
+            <div class="form-group">
+                <label>Reference Complete</label>
+                <input type="text" class="form-control" id="inpRef" value="" style="font-family:'JetBrains Mono'; font-weight:600;">
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:14px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Code (Prefix)</label>
+                    <input type="text" class="form-control" id="inpRefPrefix" value="FAC" maxlength="5" oninput="generateReference()">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Annee</label>
+                    <input type="text" class="form-control" id="inpRefYear" value="" readonly style="background:#eee;">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" class="form-control" id="inpDate" oninput="updateMeta()">
+            </div>
+
+            <!-- SECTION EMETTEUR -->
+            <span class="section-title"><i class="fas fa-building"></i> Emetteur</span>
+            <div class="form-group">
+                <label>Type de prestataire</label>
+                <select class="form-control" id="inpProviderType" onchange="handleProviderTypeChange()">
+                    <option value="SARL">SARL</option>
+                    <option value="SAS">SAS</option>
+                    <option value="SA">SA</option>
+                    <option value="EURL">EURL</option>
+                    <option value="Auto-entrepreneur">Auto-entrepreneur</option>
+                    <option value="Freelance">Freelance</option>
+                    <option value="Association">Association</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Nom / Societe</label>
+                <input type="text" class="form-control" id="inpName" value="MA SOCIETE" oninput="updateProfile()">
+            </div>
+            <div class="form-group">
+                <label>Activite</label>
+                <input type="text" class="form-control" id="inpActivity" value="Conseil" oninput="updateProfile()">
+            </div>
+            <div class="form-group">
+                <label>Adresse</label>
+                <input type="text" class="form-control" id="inpAddress" value="Paris" oninput="updateProfile()">
+            </div>
+            <div class="form-group">
+                <label>Email / Tel</label>
+                <input type="text" class="form-control" id="inpContact" value="contact@mail.com" oninput="updateProfile()">
+            </div>
+            <div class="form-group" id="siretGroup">
+                <label>SIRET / RCS</label>
+                <input type="text" class="form-control" id="inpSiret" value="XXX XXX XXX" oninput="updateProfile()">
+            </div>
+
+            <!-- SECTION CLIENT -->
+            <span class="section-title"><i class="fas fa-user"></i> Client</span>
+            <div class="form-group">
+                <label>Nom Client</label>
+                <input type="text" class="form-control" id="inpClientName" oninput="updateClient()">
+            </div>
+            <div class="form-group">
+                <label>Adresse Client</label>
+                <input type="text" class="form-control" id="inpClientAddress" oninput="updateClient()">
+            </div>
+
+            <!-- SECTION MENTIONS LEGALES -->
+            <span class="section-title"><i class="fas fa-file-signature"></i> Mentions Legales</span>
+            <div class="form-group">
+                <label>Phrase de fin / Pied de page</label>
+                <textarea class="form-control" id="inpLegalMention" rows="3" oninput="updateLegalDisplay()"></textarea>
+            </div>
+        </div>
+    </aside>
+
+    <!-- SIDEBAR DROITE (OPTIONS) -->
+    <aside class="sidebar right-panel" id="rightSidebar">
+        <div class="sb-header">
+            <h3><i class="fas fa-cogs"></i> Options</h3>
+            <button class="sb-close" onclick="closeSidebars()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="sb-body">
+            <div class="form-group">
+                <label>Type document</label>
+                <select class="form-control" id="inpDocType" onchange="handleDocTypeChange()">
+                    <option value="FACTURE">Facture</option>
+                    <option value="DEVIS">Devis</option>
+                    <option value="ACOMPTE">Acompte</option>
+                </select>
+            </div>
+
+            <!-- TVA DYNAMIQUE -->
+            <div class="form-group" id="tvaGroupContainer">
+                <label>Taux TVA (%)</label>
+                <input type="number" class="form-control" id="inpTVA" value="20" oninput="calcTotals()">
+                <small id="tvaHelper" style="display:block; margin-top:5px; font-size:0.75rem; color:var(--secondary);"></small>
+            </div>
+
+            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
+
+            <div class="form-group">
+                <label>Paiement</label>
+                <select class="form-control" id="inpPayMode" onchange="updatePaymentDisplay()">
+                    <option value="virement">Virement</option>
+                    <option value="mobile">Mobile Money</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="especes">Especes</option>
+                </select>
+            </div>
+            <div id="payFields"></div>
+
+            <div style="border-top: 1px solid #eee; margin: 20px 0;"></div>
+
+            <button class="btn-action" onclick="openModal('lineModal')"><i class="fas fa-plus"></i> Ligne</button>
+            <button class="btn-action" onclick="toggleStamp()"><i class="fas fa-stamp"></i> Cachet</button>
+            <div class="form-group" style="margin-top:15px;">
+                <label>Logo</label>
+                <input type="file" id="logoFile" accept="image/*" onchange="handleLogo(this)">
+            </div>
+        </div>
+    </aside>
+
+    <!-- CONTENU FACTURE -->
+    <div class="canvas-wrapper">
+        <div class="sheet" id="invoice">
+            <div id="watermark"><img id="watermarkImg" src="" alt=""></div>
+
+            <div class="header-grid">
+                <div class="brand">
+                    <h1 id="displayDocType">FACTURE</h1>
+                    <p id="displayActivity">Activite</p>
+                    <span class="provider-type" id="displayProviderType">SARL</span>
+                </div>
+                <div class="meta">
+                    <small style="color:var(--secondary); font-size:0.7rem; display:block;">REFERENCE</small>
+                    <span id="displayRef">REF</span>
+                    <br>
+                    <small style="color:var(--secondary); font-size:0.7rem; margin-top:8px; display:block;">DATE</small>
+                    <span id="displayDate" style="font-size:0.9rem; font-family:inherit;"></span>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="block">
+                    <h4>Emetteur</h4>
+                    <div class="block-content" id="displayEmitter"></div>
+                </div>
+                <div class="block">
+                    <h4>Client</h4>
+                    <div class="block-content" id="displayClient"></div>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:50%">Description</th>
+                        <th class="text-center">Qte</th>
+                        <th class="text-right">P.U</th>
+                        <th class="text-right">Total</th>
+                        <th style="width:30px"></th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+
+            <div class="totals-section">
+                <div class="totals-box" id="totalsBoxContent"></div>
+            </div>
+
+            <div class="footer-area">
+                <div class="stamp-container" id="stampBox">
+                    <span class="stamp-text" id="stampText">PAYE</span>
+                    <span class="stamp-sub" id="stampSub">Date</span>
+                </div>
+                <div class="footer-notes">
+                    <h4>Conditions & Mentions</h4>
+                    <div id="displayPayment"></div>
+                    <div style="margin-top:10px; font-style:italic; font-size:0.8rem;" id="displayLegalFooter"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'invoice_projects_v4';
+        const COUNTER_KEY = 'invoice_counters_v1';
+        let currentProjectId = null;
+
+        // === INIT & MENU ===
+        const leftBtn = document.getElementById('btnProfile');
+        const rightBtn = document.getElementById('btnOptions');
+        const projectsBtn = document.getElementById('btnProjects');
+        const leftSb = document.getElementById('leftSidebar');
+        const rightSb = document.getElementById('rightSidebar');
+        const overlay = document.getElementById('overlay');
+
+        leftBtn.onclick = () => { leftSb.classList.add('open'); overlay.classList.add('active'); };
+        rightBtn.onclick = () => { rightSb.classList.add('open'); overlay.classList.add('active'); };
+        projectsBtn.onclick = () => { openProjectManager(); };
+        overlay.onclick = closeSidebars;
+
+        function closeSidebars() {
+            leftSb.classList.remove('open');
+            rightSb.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Init Date
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            document.getElementById('inpDate').value = todayStr;
+            document.getElementById('inpRefYear').value = today.getFullYear();
+
+            updateMeta();
+
+            // Init Projects
+            const projects = getProjects();
+            if (projects.length === 0) {
+                openModal('startupModal');
+            } else {
+                openProjectManager();
+            }
+
+            updatePaymentDisplay();
+            handleProviderTypeChange();
+            handleDocTypeChange(); // Init Ref logic
+        });
+
+        // === LOGIQUE REFERENCE DYNAMIQUE ===
+
+        function getCounters() {
+            const data = localStorage.getItem(COUNTER_KEY);
+            return data ? JSON.parse(data) : {};
+        }
+
+        function saveCounters(counters) {
+            localStorage.setItem(COUNTER_KEY, JSON.stringify(counters));
+        }
+
+        // Génère ou met à jour la référence
+        function generateReference() {
+            const prefix = document.getElementById('inpRefPrefix').value.toUpperCase();
+            const year = document.getElementById('inpRefYear').value;
+
+            if(!prefix || !year) return;
+
+            const key = `${prefix}_${year}`;
+            const counters = getCounters();
+
+            // Si le compteur n'existe pas pour ce prefix/année, on commence à 1
+            if (!counters[key]) counters[key] = 1;
+
+            const num = counters[key];
+
+            // Formatage: FAC-2024-0001
+            const refStr = `${prefix}-${year}-${String(num).padStart(4, '0')}`;
+
+            document.getElementById('inpRef').value = refStr;
+            document.getElementById('displayRef').innerText = refStr;
+        }
+
+        // Incrémente le compteur (appelé lors de la sauvegarde finale ou création projet)
+        function incrementReference() {
+             const prefix = document.getElementById('inpRefPrefix').value.toUpperCase();
+             const year = document.getElementById('inpRefYear').value;
+             const key = `${prefix}_${year}`;
+             const counters = getCounters();
+
+             if (!counters[key]) counters[key] = 1;
+             counters[key]++; // Préparer le prochain numéro
+
+             saveCounters(counters);
+        }
+
+        // === LOGIQUE METIER ===
+
+        function handleDocTypeChange() {
+            const type = document.getElementById('inpDocType').value;
+            const prefixInput = document.getElementById('inpRefPrefix');
+
+            // Mapping automatique Type -> Prefix
+            const map = {
+                'FACTURE': 'FAC',
+                'DEVIS': 'DEV',
+                'ACOMPTE': 'ACO'
+            };
+
+            // On met à jour le prefixe seulement si l'utilisateur n'a pas changé manuellement ou si c'est nouveau
+            // Pour simplifier, on force le prefixe par défaut, mais l'utilisateur peut le changer après
+            prefixInput.value = map[type] || 'DOC';
+
+            generateReference();
+            updateDocType();
+        }
+
+        function handleProviderTypeChange() {
+            const type = document.getElementById('inpProviderType').value;
+            const tvaInput = document.getElementById('inpTVA');
+            const tvaHelper = document.getElementById('tvaHelper');
+            const siretGroup = document.getElementById('siretGroup');
+            const legalInput = document.getElementById('inpLegalMention');
+
+            siretGroup.style.display = ['Freelance', 'Auto-entrepreneur'].includes(type) ? 'none' : 'block';
+
+            if (['Freelance', 'Auto-entrepreneur'].includes(type)) {
+                tvaInput.value = 0;
+                tvaInput.disabled = true;
+                tvaInput.style.background = '#eee';
+                tvaHelper.innerText = "TVA non applicable (Franchise en base).";
+                legalInput.value = "TVA non applicable, art. 293 B du CGI.";
+            } else {
+                tvaInput.disabled = false;
+                tvaInput.style.background = '#fafafa';
+                tvaInput.value = 20;
+                tvaHelper.innerText = "";
+                legalInput.value = "Penalites de retard applicables selon les conditions generales.";
+            }
+
+            updateProfile();
+            updateLegalDisplay();
+            calcTotals();
+        }
+
+        function updateMeta() {
+            const dateVal = document.getElementById('inpDate').value;
+            if(dateVal) {
+                const dateObj = new Date(dateVal);
+                document.getElementById('displayDate').innerText = dateObj.toLocaleDateString('fr-FR');
+                // Mettre à jour l'année dans la ref si la date change
+                document.getElementById('inpRefYear').value = dateObj.getFullYear();
+                generateReference();
+            }
+        }
+
+        function updateProfile() {
+            const type = document.getElementById('inpProviderType').value;
+            const name = document.getElementById('inpName').value;
+            const act = document.getElementById('inpActivity').value;
+            const addr = document.getElementById('inpAddress').value;
+            const contact = document.getElementById('inpContact').value;
+            const siret = document.getElementById('inpSiret').value;
+
+            document.getElementById('displayProviderType').innerText = type;
+            document.getElementById('displayActivity').innerText = act;
+
+            let emitter = `<strong>${name}</strong>\n${addr}\n${contact}`;
+            if (!['Freelance', 'Auto-entrepreneur'].includes(type) && siret) {
+                emitter += `\nSIRET: ${siret}`;
+            }
+            document.getElementById('displayEmitter').innerHTML = emitter;
+        }
+
+        function updateClient() {
+            const name = document.getElementById('inpClientName').value || "Client";
+            const addr = document.getElementById('inpClientAddress').value || "";
+            document.getElementById('displayClient').innerHTML = `<strong>${name}</strong>\n${addr}`;
+        }
+
+        function updateLegalDisplay() {
+            document.getElementById('displayLegalFooter').innerText = document.getElementById('inpLegalMention').value;
+        }
+
+        function calcTotals() {
+            const tvaRate = parseFloat(document.getElementById('inpTVA').value) || 0;
+            const container = document.getElementById('totalsBoxContent');
+
+            let totalHT = 0;
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                const qty = parseFloat(row.cells[1].innerText) || 0;
+                const pu = parseFloat(row.cells[2].innerText) || 0;
+                totalHT += qty * pu;
+                row.cells[3].innerText = formatMoney(qty * pu);
+            });
+
+            const tvaVal = totalHT * (tvaRate / 100);
+            const ttc = totalHT + tvaVal;
+
+            let html = `<div class="t-row"><span>Total HT</span><span class="mono">${formatMoney(totalHT)}</span></div>`;
+
+            if (tvaRate > 0) {
+                html += `<div class="t-row"><span>TVA (${tvaRate}%)</span><span class="mono">${formatMoney(tvaVal)}</span></div>
+                <div class="t-row big"><span>Total TTC</span><span class="mono">${formatMoney(ttc)}</span></div>`;
+            } else {
+                html += `<div class="t-row tva-exempt"><span>TVA</span><span>Non applicable</span></div>
+                <div class="t-row big"><span>Total a payer</span><span class="mono">${formatMoney(totalHT)}</span></div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        function formatMoney(n) { return n.toLocaleString('fr-FR') + ' FCFA'; }
+
+        function addNewRow(desc, qty, pu) {
+            const tbody = document.getElementById('tableBody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td contenteditable="true">${desc}</td>
+                <td class="text-center" contenteditable="true" oninput="calcTotals()">${qty}</td>
+                <td class="text-right" contenteditable="true" oninput="calcTotals()">${pu}</td>
+                <td class="text-right mono">0</td>
+                <td class="btn-del-row"><button onclick="this.closest('tr').remove(); calcTotals();" style="border:none; color:#ccc; cursor:pointer; background:transparent;"><i class="fas fa-times"></i></button></td>
+            `;
+            tbody.appendChild(tr);
+            calcTotals();
+        }
+
+        function confirmAddLine() {
+            const desc = document.getElementById('modalDesc').value || 'Prestation';
+            const qty = parseFloat(document.getElementById('modalQty').value) || 1;
+            const price = parseFloat(document.getElementById('modalPrice').value) || 0;
+            addNewRow(desc, qty, price);
+            closeModal('lineModal');
+        }
+
+        function updateDocType() {
+            const type = document.getElementById('inpDocType').value;
+            const stampEl = document.getElementById('stampBox');
+            document.getElementById('displayDocType').innerText = type;
+            stampEl.classList.remove('type-invoice', 'type-quote', 'type-deposit');
+
+            if (type === "FACTURE") {
+                document.getElementById('stampText').innerText = "PAYE";
+                stampEl.classList.add('type-invoice');
+            } else if (type === "DEVIS") {
+                document.getElementById('stampText').innerText = "BON POUR ACCORD";
+                stampEl.classList.add('type-quote');
+            } else {
+                document.getElementById('stampText').innerText = "ACOMPTE";
+                stampEl.classList.add('type-deposit');
+            }
+        }
+
+        function updatePaymentDisplay() {
+            const mode = document.getElementById('inpPayMode').value;
+            const container = document.getElementById('payFields');
+            let html = "";
+            if(mode === 'virement') html = `<input type="text" class="form-control" id="inpBank" value="IBAN FR76..." placeholder="IBAN" oninput="refreshPaymentText()">`;
+            if(mode === 'mobile') html = `<input type="text" class="form-control" id="inpMoMo" value="+237 6XX" placeholder="Numero" oninput="refreshPaymentText()">`;
+            container.innerHTML = html;
+            refreshPaymentText();
+        }
+
+        function refreshPaymentText() {
+            const mode = document.getElementById('inpPayMode').value;
+            let text = `Mode de paiement: ${mode.toUpperCase()}. `;
+            if(mode === 'virement') text += `RIB: ${document.getElementById('inpBank')?.value || ''}.`;
+            if(mode === 'mobile') text += `Numero: ${document.getElementById('inpMoMo')?.value || ''}.`;
+            document.getElementById('displayPayment').innerText = text;
+        }
+
+        function handleLogo(input) {
+            if(input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('watermarkImg').src = e.target.result;
+                    document.getElementById('watermark').style.display = 'flex';
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function toggleStamp() { document.getElementById('stampBox').classList.toggle('show'); }
+
+        // === PERSISTENCE ===
+        function getProjects() {
+            const data = localStorage.getItem(STORAGE_KEY);
+            return data ? JSON.parse(data) : [];
+        }
+        function saveProjects(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+
+        function collectFormData() {
+            return {
+                ref: document.getElementById('inpRef').value,
+                prefix: document.getElementById('inpRefPrefix').value,
+                date: document.getElementById('inpDate').value,
+                providerType: document.getElementById('inpProviderType').value,
+                name: document.getElementById('inpName').value,
+                activity: document.getElementById('inpActivity').value,
+                address: document.getElementById('inpAddress').value,
+                contact: document.getElementById('inpContact').value,
+                siret: document.getElementById('inpSiret').value,
+                legalMention: document.getElementById('inpLegalMention').value,
+                clientName: document.getElementById('inpClientName').value,
+                clientAddress: document.getElementById('inpClientAddress').value,
+                docType: document.getElementById('inpDocType').value,
+                tva: document.getElementById('inpTVA').value,
+                payMode: document.getElementById('inpPayMode').value,
+                lines: Array.from(document.querySelectorAll('#tableBody tr')).map(r => ({
+                    desc: r.cells[0].innerText, qty: r.cells[1].innerText, pu: r.cells[2].innerText
+                }))
+            };
+        }
+
+        function loadProjectData(d) {
+            document.getElementById('inpRefPrefix').value = d.prefix || 'FAC';
+            document.getElementById('inpRef').value = d.ref || '';
+            document.getElementById('inpDate').value = d.date || '';
+            document.getElementById('inpProviderType').value = d.providerType || 'SARL';
+            document.getElementById('inpName').value = d.name || '';
+            document.getElementById('inpActivity').value = d.activity || '';
+            document.getElementById('inpAddress').value = d.address || '';
+            document.getElementById('inpContact').value = d.contact || '';
+            document.getElementById('inpSiret').value = d.siret || '';
+            document.getElementById('inpLegalMention').value = d.legalMention || '';
+            document.getElementById('inpClientName').value = d.clientName || '';
+            document.getElementById('inpClientAddress').value = d.clientAddress || '';
+            document.getElementById('inpDocType').value = d.docType || 'FACTURE';
+            document.getElementById('inpTVA').value = d.tva || 0;
+            document.getElementById('inpPayMode').value = d.payMode || 'virement';
+
+            document.getElementById('tableBody').innerHTML = '';
+            if(d.lines) d.lines.forEach(l => addNewRow(l.desc, l.qty, l.pu));
+
+            // Updates - call handleDocTypeChange to properly set stamp and display
+            updateMeta();
+            handleDocTypeChange(); // This sets the document type display and stamp
+            updateProfile();
+            updateClient();
+            updateLegalDisplay();
+            updatePaymentDisplay();
+            calcTotals();
+        }
+
+        function createProjectFromStartup() {
+            const name = document.getElementById('startupName').value || `Facture ${new Date().toLocaleDateString('fr-FR')}`;
+            createNewProject(name);
+            closeModal('startupModal');
+        }
+
+        function initNewProject() {
+            const name = prompt("Nom de la nouvelle facture :");
+            if(name) {
+                createNewProject(name);
+                closeModal('projectsModal');
+            }
+        }
+
+        function createNewProject(name) {
+            // D'abord générer la ref
+            handleDocTypeChange(); // met à jour prefix et ref
+            incrementReference(); // sauvegarde le prochain numéro
+
+            const project = {
+                id: Date.now(),
+                name: name,
+                date: new Date().toISOString(),
+                data: collectFormData()
+            };
+
+            const projects = getProjects();
+            projects.unshift(project);
+            saveProjects(projects);
+            loadProject(project.id);
+        }
+
+        function loadProject(id) {
+            const projects = getProjects();
+            const p = projects.find(x => x.id === id);
+            if(p) {
+                currentProjectId = id;
+                loadProjectData(p.data);
+                closeModal('projectsModal');
+            }
+        }
+
+        function saveCurrentProject() {
+            if(!currentProjectId) return;
+            let projects = getProjects();
+            const idx = projects.findIndex(x => x.id === currentProjectId);
+            if(idx !== -1) {
+                projects[idx].data = collectFormData();
+                saveProjects(projects);
+                alert("Sauvegarde effectuee !");
+            }
+        }
+
+        function deleteProject(id) {
+            if(!confirm("Supprimer ?")) return;
+            let projects = getProjects().filter(x => x.id !== id);
+            saveProjects(projects);
+            if(id === currentProjectId) currentProjectId = null;
+            renderProjectList();
+        }
+
+        function openProjectManager() {
+            openModal('projectsModal');
+            renderProjectList();
+            const section = document.getElementById('currentProjectSection');
+            if(currentProjectId) {
+                const p = getProjects().find(x => x.id === currentProjectId);
+                if(p) {
+                    section.style.display = 'block';
+                    document.getElementById('currentProjectName').innerText = p.name;
+                }
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
+        function renderProjectList(filter = '') {
+            const container = document.getElementById('projectList');
+            let projects = getProjects();
+            if(filter) projects = projects.filter(p => p.name.toLowerCase().includes(filter.toLowerCase()));
+
+            container.innerHTML = projects.map(p => `
+                <div class="project-item">
+                    <div class="project-info" onclick="loadProject(${p.id})">
+                        <h4>${p.name}</h4>
+                        <span>${new Date(p.date).toLocaleDateString('fr-FR')} - Ref: ${p.data.ref || 'N/A'}</span>
+                    </div>
+                    <div class="project-actions">
+                        <button class="btn-load" onclick="loadProject(${p.id})"><i class="fas fa-folder-open"></i></button>
+                        <button class="btn-delete" onclick="deleteProject(${p.id})"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('') || `<div class="empty-state"><p>Aucun projet</p></div>`;
+        }
+
+        function filterProjects() {
+            renderProjectList(document.getElementById('searchInput').value);
+        }
+
+        function printCurrentProject() { window.print(); }
+    </script>
+</body>
+</html>
