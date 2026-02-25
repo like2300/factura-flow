@@ -36,6 +36,10 @@ distribution/
 *.exe
 *.msi
 *.app
+*.AppImage
+*.deb
+*.rpm
+*.pkg.tar.zst
 
 # IDE
 .vscode/
@@ -71,3 +75,8 @@ data/*.json
 *.tmp
 *.temp
 rw.*.dmg
+
+# Linux
+AppDir/
+appimagetool-*.AppImage
+*.desktop

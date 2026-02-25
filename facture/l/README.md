@@ -2,7 +2,7 @@
 
 **Factura Flow** est une application multi-plateforme pour créer et gérer des factures professionnelles de manière simple et élégante.
 
-![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 ![Python](https://img.shields.io/badge/python-3.8+-green)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -14,7 +14,7 @@
 
 **Option 1 : Utiliser l'installateur (Recommandé)**
 
-1. Téléchargez `distribution/Factura Flow.dmg`
+1. Téléchargez `Factura Flow.dmg` depuis les Releases
 2. Ouvrez le fichier DMG
 3. Glissez **Factura Flow.app** dans **Applications**
 
@@ -29,15 +29,50 @@ cd /path/to/factura-flow
 
 **Option 1 : Exécutable direct**
 
-1. Copie le dossier sur Windows
-2. Double-clique sur `build-windows.bat`
-3. Lance `dist\Factura Flow.exe`
+1. Télécharge `Factura Flow.exe` depuis les Releases
+2. Double-clique pour lancer
 
-**Option 2 : Installateur**
+**Option 2 : Build depuis les sources**
 
-Utilise Inno Setup avec `factura-flow-setup.iss`
+```cmd
+build-windows.bat
+```
 
-📖 **Guide complet** : Voir [README-WINDOWS.md](README-WINDOWS.md)
+### 🐧 Linux
+
+**Option 1 : AppImage (Universel)**
+
+```bash
+# Télécharger depuis les Releases
+chmod +x FacturaFlow-x86_64.AppImage
+./FacturaFlow-x86_64.AppImage
+```
+
+**Option 2 : Arch Linux (AUR)**
+
+```bash
+# Avec yay
+yay -S factura-flow
+
+# Avec paru
+paru -S factura-flow
+```
+
+**Option 3 : Build depuis les sources**
+
+```bash
+# Ubuntu/Debian
+sudo apt install python3-pip python3-venv libgtk-3-dev libwebkit2gtk-4.0-dev
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt pyinstaller
+python main_windows.py
+```
+
+📖 **Guides complets** :
+- [Windows](README-WINDOWS.md)
+- [Linux](README-LINUX.md)
+- [Build depuis macOS](BUILD-DEPUIS-MAC.md)
 
 ---
 

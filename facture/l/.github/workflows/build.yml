@@ -1,4 +1,4 @@
-name: Build Windows EXE
+name: Build All Platforms
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ==================== WINDOWS ====================
   build-windows:
     runs-on: windows-latest
     
@@ -35,6 +36,7 @@ jobs:
           --hidden-import=webview `
           --hidden-import=http.server `
           --hidden-import=socketserver `
+          --hidden-import=pil `
           main_windows.py
           
     - name: Upload EXE
@@ -42,15 +44,17 @@ jobs:
       with:
         name: Factura-Flow-Windows
         path: dist/Factura Flow.exe
+        retention-days: 30
         
-    - name: Create Release
+    - name: Create Release Asset
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: dist/Factura Flow.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # ==================== macOS ====================
   build-macos:
     runs-on: macos-latest
     
@@ -67,7 +71,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pyinstaller pillow
+        pip install pyinstaller pillow create-dmg
         
     - name: Build DMG
       run: |
@@ -80,11 +84,260 @@ jobs:
       with:
         name: Factura-Flow-macOS
         path: distribution/Factura Flow.dmg
+        retention-days: 30
         
-    - name: Create Release
+    - name: Create Release Asset
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: distribution/Factura Flow.dmg
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==================== Ubuntu Linux ====================
+  build-ubuntu:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-dev \
+          python3-pip \
+          libgtk-3-dev \
+          libwebkit2gtk-4.0-dev \
+          libappindicator3-dev \
+          librsvg2-dev \
+          xvfb
+          
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller pillow
+        
+    - name: Build Linux AppImage
+      run: |
+        # Build executable
+        pyinstaller --name="FacturaFlow" \
+          --windowed \
+          --onefile \
+          --icon=icons/icon.ico \
+          --add-data "web:web" \
+          --hidden-import=webview \
+          --hidden-import=http.server \
+          --hidden-import=socketserver \
+          --hidden-import=pil \
+          main_windows.py
+          
+        # Create AppDir structure
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        cp dist/FacturaFlow AppDir/usr/bin/
+        cp icons/icon.ico AppDir/usr/share/icons/hicolor/256x256/apps/facturaflow.ico
+        cp icons/logo.png AppDir/facturaflow.png
+        
+        # Create desktop file
+        cat > AppDir/facturaflow.desktop << EOF
+        [Desktop Entry]
+        Name=Factura Flow
+        Exec=FacturaFlow
+        Icon=facturaflow
+        Type=Application
+        Categories=Office;Finance;
+        Comment=Invoice Generator Application
+        EOF
+        
+        # Create AppRun
+        cat > AppDir/AppRun << 'EOF'
+        #!/bin/bash
+        SELF=$(readlink -f "$0")
+        HERE=${SELF%/*}
+        export PATH="${HERE}/usr/bin:${PATH}"
+        exec "${HERE}/usr/bin/FacturaFlow" "$@"
+        EOF
+        chmod +x AppDir/AppRun
+        
+        # Download and install appimagetool
+        wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        ARCH=x86_64 ./appimagetool-x86_64.AppImage AppDir/
+        
+    - name: Upload AppImage
+      uses: actions/upload-artifact@v4
+      with:
+        name: Factura-Flow-Ubuntu-x64
+        path: FacturaFlow-x86_64.AppImage
+        retention-days: 30
+        
+    - name: Create Release Asset
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: FacturaFlow-x86_64.AppImage
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==================== Arch Linux ====================
+  build-arch:
+    runs-on: ubuntu-22.04
+    container:
+      image: archlinux:latest
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Update system and install dependencies
+      run: |
+        pacman -Syu --noconfirm
+        pacman -S --noconfirm \
+          python \
+          python-pip \
+          python-pywebview \
+          python-pillow \
+          python-pyinstaller \
+          webkit2gtk \
+          gtk3 \
+          libappindicator-gtk3 \
+          librsvg \
+          appimagetool \
+          desktop-file-utils \
+          shared-mime-info
+          
+    - name: Install Python dependencies
+      run: |
+        pip install --break-system-packages -r requirements.txt
+        pip install --break-system-packages pyinstaller pillow
+        
+    - name: Build for Arch Linux
+      run: |
+        # Build executable
+        pyinstaller --name="FacturaFlow" \
+          --windowed \
+          --onefile \
+          --icon=icons/icon.ico \
+          --add-data "web:web" \
+          --hidden-import=webview \
+          --hidden-import=http.server \
+          --hidden-import=socketserver \
+          --hidden-import=pil \
+          main_windows.py
+          
+        # Create AppDir structure
+        mkdir -p AppDir/usr/bin
+        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+        cp dist/FacturaFlow AppDir/usr/bin/
+        cp icons/logo.png AppDir/facturaflow.png
+        
+        # Create desktop file
+        cat > AppDir/facturaflow.desktop << EOF
+        [Desktop Entry]
+        Name=Factura Flow
+        Exec=FacturaFlow
+        Icon=facturaflow
+        Type=Application
+        Categories=Office;Finance;
+        Comment=Invoice Generator Application
+        EOF
+        
+        # Create AppRun
+        cat > AppDir/AppRun << 'EOF'
+        #!/bin/bash
+        SELF=$(readlink -f "$0")
+        HERE=${SELF%/*}
+        export PATH="${HERE}/usr/bin:${PATH}"
+        export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"
+        exec "${HERE}/usr/bin/FacturaFlow" "$@"
+        EOF
+        chmod +x AppDir/AppRun
+        
+        # Build AppImage
+        appimagetool AppDir/
+        
+    - name: Upload AppImage
+      uses: actions/upload-artifact@v4
+      with:
+        name: Factura-Flow-Arch-x64
+        path: FacturaFlow-x86_64.AppImage
+        retention-days: 30
+        
+    - name: Create Release Asset
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: FacturaFlow-x86_64.AppImage
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ==================== Create Summary Release ====================
+  create-release:
+    runs-on: ubuntu-22.04
+    needs: [build-windows, build-macos, build-ubuntu, build-arch]
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        
+    - name: Create release notes
+      run: |
+        echo "🎉 Factura Flow Release ${{ github.ref_name }}" > release_notes.md
+        echo "" >> release_notes.md
+        echo "## 📦 Downloads" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🍎 macOS" >> release_notes.md
+        echo "- **Factura Flow.dmg** - Installateur macOS (Intel/Apple Silicon)" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🪟 Windows" >> release_notes.md
+        echo "- **Factura Flow.exe** - Application Windows (64-bit)" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### 🐧 Linux" >> release_notes.md
+        echo "- **FacturaFlow-x86_64.AppImage** - Ubuntu/Debian (64-bit)" >> release_notes.md
+        echo "- **FacturaFlow-x86_64.AppImage** - Arch Linux/Manjaro (64-bit)" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## 📝 Installation" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### macOS" >> release_notes.md
+        echo "1. Télécharger le fichier .dmg" >> release_notes.md
+        echo "2. Ouvrir et glisser dans Applications" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Windows" >> release_notes.md
+        echo "1. Télécharger le fichier .exe" >> release_notes.md
+        echo "2. Double-cliquer pour lancer" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Linux" >> release_notes.md
+        echo "1. Télécharger le fichier .AppImage" >> release_notes.md
+        echo "2. Rendre exécutable: \`chmod +x FacturaFlow-x86_64.AppImage\`" >> release_notes.md
+        echo "3. Lancer: \`./FacturaFlow-x86_64.AppImage\`" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "## ✨ Features" >> release_notes.md
+        echo "- ✅ Factures professionnelles" >> release_notes.md
+        echo "- ✅ Devis & Acomptes" >> release_notes.md
+        echo "- ✅ Références automatiques" >> release_notes.md
+        echo "- ✅ Calcul TVA automatique" >> release_notes.md
+        echo "- ✅ Sauvegarde locale" >> release_notes.md
+        echo "- ✅ Multi-plateforme" >> release_notes.md
+        
+    - name: Update Release
+      uses: softprops/action-gh-release@v2
+      with:
+        body_path: release_notes.md
+        files: |
+          artifacts/Factura-Flow-Windows/*
+          artifacts/Factura-Flow-macOS/*
+          artifacts/Factura-Flow-Ubuntu-x64/*
+          artifacts/Factura-Flow-Arch-x64/*
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

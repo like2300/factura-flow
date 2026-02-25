@@ -1,0 +1,61 @@
+# Maintainer: Your Name <your.email@example.com>
+# Contributor: Factura Flow Team
+
+pkgname=factura-flow
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Professional invoice generator application"
+arch=('x86_64')
+url="https://github.com/like2300/factura-flow"
+license=('MIT')
+depends=(
+  'python'
+  'python-pywebview'
+  'python-pillow'
+  'webkit2gtk'
+  'gtk3'
+  'libappindicator-gtk3'
+)
+makedepends=(
+  'python-pip'
+  'python-pyinstaller'
+  'git'
+)
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/like2300/factura-flow/archive/v${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "${srcdir}/${pkgname}-${pkgver}"
+  
+  # Install Python dependencies
+  pip install --no-cache-dir --no-warn-script-location \
+    --prefix="${pkgdir}/usr" \
+    -r requirements.txt
+  
+  # Build with PyInstaller
+  pyinstaller --name="FacturaFlow" \
+    --windowed \
+    --onefile \
+    --icon=icons/icon.ico \
+    --add-data "web:web" \
+    --hidden-import=webview \
+    --hidden-import=http.server \
+    --hidden-import=socketserver \
+    main_windows.py
+}
+
+package() {
+  cd "${srcdir}/${pkgname}-${pkgver}"
+  
+  # Install executable
+  install -Dm755 "dist/FacturaFlow" "${pkgdir}/usr/bin/factura-flow"
+  
+  # Install desktop file
+  install -Dm644 "facturaflow.desktop" "${pkgdir}/usr/share/applications/factura-flow.desktop"
+  
+  # Install icon
+  install -Dm644 "icons/logo.png" "${pkgdir}/usr/share/icons/hicolor/256x256/apps/factura-flow.png"
+  
+  # Install license
+  install -Dm644 "LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
